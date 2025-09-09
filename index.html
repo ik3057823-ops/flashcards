@@ -21,7 +21,7 @@
     .progress{font-size:14px;color:var(--ink-dim)}
 
     .stage{display:grid;gap:16px}
-    .controls{display:flex;flex-wrap:wrap;gap:10px}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
     .btn{appearance:none;border:1px solid var(--soft-2);background:#fff;color:var(--ink);padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600;touch-action:manipulation}
     .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
     .btn.ghost{background:transparent}
@@ -49,7 +49,6 @@
 
     .footer{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
     .msg{min-height:1.2em;text-align:center;font-size:14px;margin-top:8px}
-    .msg.ok{color:var(--ok)} .msg.bad{color:var(--bad)}
 
     /* Results */
     .results{text-align:center}
@@ -69,7 +68,7 @@
         <h1>Build the Words — Flashcards</h1>
         <div class="progress" id="progress">1 / 15</div>
       </div>
-      <p class="sub">Tap the card to reveal the word. Use the buttons to track what you know.</p>
+      <p class="sub">Tap the card to reveal the word. Use Previous/Next to navigate and “I knew it” to mark progress.</p>
 
       <div class="stage">
         <div class="fc-wrap">
@@ -86,10 +85,9 @@
         </div>
 
         <div class="footer">
-          <button class="btn" id="flipBtn">Flip</button>
+          <button class="btn" id="prevBtn">⟵ Previous</button>
+          <button class="btn" id="nextBtn">Next ⟶</button>
           <button class="btn primary" id="knowBtn">I knew it ✓</button>
-          <button class="btn" id="againBtn">Practice again ↺</button>
-          <button class="btn ghost" id="speakBtn">🔈 Say it</button>
           <button class="btn" id="shuffleBtn">Shuffle deck</button>
           <button class="btn" id="restartBtn">Restart</button>
         </div>
@@ -126,10 +124,11 @@
     ];
 
     // ---------- State
-    let queue = [];          // indices of cards to show
-    let current = null;      // current index
+    let order = [];               // indices into DECK
+    let pos = 0;                  // current position in order
     let flipped = false;
-    let stats = { seen: 0, known: 0, again: 0 };
+    let known = new Array(DECK.length).fill(false);
+    let knownCount = 0;
 
     // ---------- DOM helpers
     const $ = sel => document.querySelector(sel);
@@ -140,99 +139,86 @@
     const message = $("#message");
 
     // ---------- Utilities
-    function shuffle(arr) {
-      const a = arr.slice();
-      for (let i=a.length-1; i>0; i--) {
-        const j = Math.floor(Math.random() * (i+1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
+    function shuffle(arr){
+      const a=arr.slice();
+      for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
       return a;
     }
 
-    function setProgress() {
-      const remaining = queue.length + (current === null ? 0 : 1);
-      const total = DECK.length + stats.again; // total attempts includes re-queued
-      progress.textContent = `${DECK.length - (queue.length + (current!==null?0:1)) + 1} / ${DECK.length}`;
+    function setProgress(){
+      progress.textContent = `${pos+1} / ${DECK.length}`;
     }
 
-    function renderCard(idx) {
+    function render(){
+      const idx = order[pos];
       const { def, word } = DECK[idx];
       defText.textContent = def;
       wordText.textContent = word;
       flashcard.classList.toggle("flipped", flipped);
-      message.textContent = "";
       setProgress();
+      $("#prevBtn").disabled = pos === 0;
+      $("#nextBtn").disabled = pos === DECK.length - 1;
+      // subtle message for known state
+      message.textContent = known[idx] ? "Marked as known ✓" : "";
     }
 
-    function flipCard() {
-      flipped = !flipped;
-      flashcard.classList.toggle("flipped", flipped);
+    function flip(){ flipped = !flipped; flashcard.classList.toggle("flipped", flipped); }
+
+    function next(){
+      if (pos < DECK.length - 1){ pos++; flipped = false; render(); }
+      maybeFinish();
     }
 
-    function speak(text) {
-      try {
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = "en-US";
-        speechSynthesis.cancel();
-        speechSynthesis.speak(u);
-      } catch {}
+    function prev(){
+      if (pos > 0){ pos--; flipped = false; render(); }
     }
 
-    // ---------- Flow
-    function nextCard() {
-      if (queue.length === 0) { showResults(); return; }
-      current = queue.shift();
-      flipped = false;
-      renderCard(current);
-    }
-
-    function markKnown() {
-      stats.known++; stats.seen++;
+    function markKnown(){
+      const idx = order[pos];
+      if (!known[idx]) { known[idx] = true; knownCount++; }
       message.textContent = "Marked as known ✓";
-      nextCard();
+      // auto-advance if possible
+      if (pos < DECK.length - 1){ pos++; flipped = false; render(); }
+      maybeFinish();
     }
 
-    function markAgain() {
-      stats.again++; stats.seen++;
-      message.textContent = "Added back to practice ↺";
-      // push current card to end of queue
-      queue.push(current);
-      nextCard();
+    function maybeFinish(){
+      if (knownCount === DECK.length){
+        showResults();
+      }
     }
 
-    // ---------- Results
-    function showResults() {
+    function showResults(){
       $("#appCard").style.display = "none";
       $("#resultsCard").style.display = "block";
-      $("#summary").textContent = `Great work!`;
-      $("#detail").textContent = `You marked ${stats.known} as known and sent ${stats.again} back for extra practice.`;
+      $("#summary").textContent = "Great work!";
+      $("#detail").textContent = `You marked ${knownCount} out of ${DECK.length} cards as known.`;
     }
 
-    function restart(shuffleFirst = false) {
+    function restart(shuffleFirst=false){
       $("#resultsCard").style.display = "none";
       $("#appCard").style.display = "block";
-      stats = { seen: 0, known: 0, again: 0 };
-      const order = shuffleFirst ? shuffle(DECK.map((_,i)=>i)) : DECK.map((_,i)=>i);
-      queue = order.slice();
-      current = null;
-      nextCard();
+      order = DECK.map((_,i)=>i);
+      if (shuffleFirst) order = shuffle(order);
+      pos = 0; flipped = false;
+      known.fill(false); knownCount = 0;
+      render();
     }
 
     // ---------- Events
-    $("#flipBtn").addEventListener("click", flipCard);
+    flashcard.addEventListener("click", flip);
+    flashcard.addEventListener("keydown", e => {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); flip(); }
+      if (e.key === "ArrowLeft") { prev(); }
+      if (e.key === "ArrowRight") { next(); }
+    });
+
+    $("#prevBtn").addEventListener("click", prev);
+    $("#nextBtn").addEventListener("click", next);
     $("#knowBtn").addEventListener("click", markKnown);
-    $("#againBtn").addEventListener("click", markAgain);
-    $("#speakBtn").addEventListener("click", () => speak(DECK[current].word));
     $("#shuffleBtn").addEventListener("click", () => restart(true));
     $("#restartBtn").addEventListener("click", () => restart(false));
     $("#tryAgainBtn").addEventListener("click", () => restart(true));
-
-    flashcard.addEventListener("click", flipCard);
-    flashcard.addEventListener("keydown", e => {
-      if (e.key === " " || e.key === "Enter") { e.preventDefault(); flipCard(); }
-      if (e.key === "ArrowLeft") { markAgain(); }
-      if (e.key === "ArrowRight") { markKnown(); }
-    });
 
     // ---------- Init
     restart(true);
