@@ -3,12 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Build the Words — Flashcards</title>
+  <title>Flashcards</title>
   <style>
     :root {
       --bg:#ffffff; --ink:#1f2937; --ink-dim:#6b7280;
-      --brand:#2563eb; --ok:#16a34a; --bad:#dc2626;
-      --soft:#f3f4f6; --soft-2:#e5e7eb; --radius:14px;
+      --brand:#2563eb; --ok:#16a34a; --soft:#f3f4f6; --soft-2:#e5e7eb; --radius:14px;
     }
     *{box-sizing:border-box}
     html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Inter,Arial,sans-serif}
@@ -24,7 +23,6 @@
     .controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
     .btn{appearance:none;border:1px solid var(--soft-2);background:#fff;color:var(--ink);padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600;touch-action:manipulation}
     .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
-    .btn.ghost{background:transparent}
     .btn:disabled{opacity:.5;cursor:not-allowed}
 
     /* Flashcard */
@@ -65,10 +63,10 @@
   <div class="wrap">
     <div class="card" id="appCard">
       <div class="topbar">
-        <h1>Build the Words — Flashcards</h1>
+        <h1>Flashcards</h1>
         <div class="progress" id="progress">1 / 15</div>
       </div>
-      <p class="sub">Tap the card to reveal the word. Use Previous/Next to navigate and “I knew it” to mark progress.</p>
+      <p class="sub">Tap the card to flip, and use Previous/Next to navigate and “I knew it” to mark progress.</p>
 
       <div class="stage">
         <div class="fc-wrap">
@@ -158,7 +156,6 @@
       setProgress();
       $("#prevBtn").disabled = pos === 0;
       $("#nextBtn").disabled = pos === DECK.length - 1;
-      // subtle message for known state
       message.textContent = known[idx] ? "Marked as known ✓" : "";
     }
 
@@ -177,7 +174,6 @@
       const idx = order[pos];
       if (!known[idx]) { known[idx] = true; knownCount++; }
       message.textContent = "Marked as known ✓";
-      // auto-advance if possible
       if (pos < DECK.length - 1){ pos++; flipped = false; render(); }
       maybeFinish();
     }
