@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Build the Words — Flashcards</title>
+  <style>
+    :root {
+      --bg:#ffffff; --ink:#1f2937; --ink-dim:#6b7280;
+      --brand:#2563eb; --ok:#16a34a; --bad:#dc2626;
+      --soft:#f3f4f6; --soft-2:#e5e7eb; --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Inter,Arial,sans-serif}
+    .wrap{max-width:780px;width:100%;margin:0 auto;padding:16px}
+    .card{background:#fff;border:1px solid var(--soft-2);border-radius:var(--radius);padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.04);max-width:100%}
+    h1{font-size:clamp(20px,3vw,28px);margin:0 0 8px}
+    .sub{color:var(--ink-dim);margin:0 0 18px;font-size:14px}
+
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .progress{font-size:14px;color:var(--ink-dim)}
+
+    .stage{display:grid;gap:16px}
+    .controls{display:flex;flex-wrap:wrap;gap:10px}
+    .btn{appearance:none;border:1px solid var(--soft-2);background:#fff;color:var(--ink);padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600;touch-action:manipulation}
+    .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+    .btn.ghost{background:transparent}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+
+    /* Flashcard */
+    .fc-wrap{perspective:1200px}
+    .flashcard{
+      position:relative;height:min(380px,58vh);border-radius:16px;background:#fff;
+      border:1px solid var(--soft-2);box-shadow:0 10px 30px rgba(0,0,0,.06);
+      transform-style:preserve-3d;transition:transform .45s ease;
+      display:grid;place-items:center;padding:22px
+    }
+    .flashcard.flipped{transform:rotateY(180deg)}
+    .fc-face{
+      position:absolute;inset:0;border-radius:16px;padding:22px;
+      display:flex;flex-direction:column;justify-content:center;align-items:center;
+      backface-visibility:hidden;
+    }
+    .front{background:#fff}
+    .back{background:#fff;transform:rotateY(180deg)}
+    .def{font-size:clamp(16px,2.4vw,20px);text-align:center;line-height:1.4}
+    .word{font-size:clamp(28px,5vw,40px);font-weight:800;text-align:center}
+    .hint{margin-top:10px;color:var(--ink-dim);font-size:13px}
+
+    .footer{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+    .msg{min-height:1.2em;text-align:center;font-size:14px;margin-top:8px}
+    .msg.ok{color:var(--ok)} .msg.bad{color:var(--bad)}
+
+    /* Results */
+    .results{text-align:center}
+    .stat{font-size:15px;color:var(--ink-dim);margin:6px 0}
+
+    @media (max-width:480px){
+      .wrap{padding:12px}
+      .flashcard{height:50vh}
+      .btn{padding:9px 12px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" id="appCard">
+      <div class="topbar">
+        <h1>Build the Words — Flashcards</h1>
+        <div class="progress" id="progress">1 / 15</div>
+      </div>
+      <p class="sub">Tap the card to reveal the word. Use the buttons to track what you know.</p>
+
+      <div class="stage">
+        <div class="fc-wrap">
+          <div class="flashcard" id="flashcard" tabindex="0" aria-label="Flashcard">
+            <div class="fc-face front">
+              <div class="def" id="defText">Definition here</div>
+              <div class="hint">Tap or press Space/Enter to flip</div>
+            </div>
+            <div class="fc-face back">
+              <div class="word" id="wordText">Word</div>
+              <div class="hint">Tap to flip back</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <button class="btn" id="flipBtn">Flip</button>
+          <button class="btn primary" id="knowBtn">I knew it ✓</button>
+          <button class="btn" id="againBtn">Practice again ↺</button>
+          <button class="btn ghost" id="speakBtn">🔈 Say it</button>
+          <button class="btn" id="shuffleBtn">Shuffle deck</button>
+          <button class="btn" id="restartBtn">Restart</button>
+        </div>
+        <div class="msg" id="message" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div class="card results" id="resultsCard" style="display:none">
+      <h1>Results</h1>
+      <p class="stat" id="summary"></p>
+      <p class="stat" id="detail"></p>
+      <button class="btn primary" id="tryAgainBtn">Try Again</button>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Data: definition (front) -> term (back)
+    const DECK = [
+      { word: "diet", def: "The usual food and drink a person eats; also a controlled eating plan." },
+      { word: "junk food", def: "Food high in sugar, salt, or fat and low in nutrients (e.g., many snacks or fast foods)." },
+      { word: "whole food", def: "Food that is minimally processed and free of many additives; close to its natural form." },
+      { word: "food security", def: "Reliable access to enough safe and nutritious food to live a healthy life." },
+      { word: "takeaway", def: "Food prepared by a restaurant to be eaten elsewhere (also called takeout)." },
+      { word: "processed", def: "Food changed from its natural state (e.g., adding salt, sugar, preservatives, or other steps in a factory)." },
+      { word: "perishable", def: "Food that spoils quickly without refrigeration (e.g., milk, fresh meat)." },
+      { word: "wholesome", def: "Good for health; pure, simple, and nourishing." },
+      { word: "organic", def: "Grown or made without most synthetic pesticides or fertilizers, following organic standards." },
+      { word: "nutritious", def: "Nourishing; provides useful nutrients like vitamins, minerals, and protein." },
+      { word: "consume", def: "To eat or drink; also to use up." },
+      { word: "tempted", def: "Feeling a strong desire to do something you maybe shouldn’t (e.g., eat unhealthy food)." },
+      { word: "reduce", def: "To make smaller or less in amount, size, or number." },
+      { word: "sample", def: "To try a small amount to test the taste or quality." },
+      { word: "digest", def: "To break down food in the body so it can be absorbed and used." }
+    ];
+
+    // ---------- State
+    let queue = [];          // indices of cards to show
+    let current = null;      // current index
+    let flipped = false;
+    let stats = { seen: 0, known: 0, again: 0 };
+
+    // ---------- DOM helpers
+    const $ = sel => document.querySelector(sel);
+    const flashcard = $("#flashcard");
+    const defText = $("#defText");
+    const wordText = $("#wordText");
+    const progress = $("#progress");
+    const message = $("#message");
+
+    // ---------- Utilities
+    function shuffle(arr) {
+      const a = arr.slice();
+      for (let i=a.length-1; i>0; i--) {
+        const j = Math.floor(Math.random() * (i+1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function setProgress() {
+      const remaining = queue.length + (current === null ? 0 : 1);
+      const total = DECK.length + stats.again; // total attempts includes re-queued
+      progress.textContent = `${DECK.length - (queue.length + (current!==null?0:1)) + 1} / ${DECK.length}`;
+    }
+
+    function renderCard(idx) {
+      const { def, word } = DECK[idx];
+      defText.textContent = def;
+      wordText.textContent = word;
+      flashcard.classList.toggle("flipped", flipped);
+      message.textContent = "";
+      setProgress();
+    }
+
+    function flipCard() {
+      flipped = !flipped;
+      flashcard.classList.toggle("flipped", flipped);
+    }
+
+    function speak(text) {
+      try {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "en-US";
+        speechSynthesis.cancel();
+        speechSynthesis.speak(u);
+      } catch {}
+    }
+
+    // ---------- Flow
+    function nextCard() {
+      if (queue.length === 0) { showResults(); return; }
+      current = queue.shift();
+      flipped = false;
+      renderCard(current);
+    }
+
+    function markKnown() {
+      stats.known++; stats.seen++;
+      message.textContent = "Marked as known ✓";
+      nextCard();
+    }
+
+    function markAgain() {
+      stats.again++; stats.seen++;
+      message.textContent = "Added back to practice ↺";
+      // push current card to end of queue
+      queue.push(current);
+      nextCard();
+    }
+
+    // ---------- Results
+    function showResults() {
+      $("#appCard").style.display = "none";
+      $("#resultsCard").style.display = "block";
+      $("#summary").textContent = `Great work!`;
+      $("#detail").textContent = `You marked ${stats.known} as known and sent ${stats.again} back for extra practice.`;
+    }
+
+    function restart(shuffleFirst = false) {
+      $("#resultsCard").style.display = "none";
+      $("#appCard").style.display = "block";
+      stats = { seen: 0, known: 0, again: 0 };
+      const order = shuffleFirst ? shuffle(DECK.map((_,i)=>i)) : DECK.map((_,i)=>i);
+      queue = order.slice();
+      current = null;
+      nextCard();
+    }
+
+    // ---------- Events
+    $("#flipBtn").addEventListener("click", flipCard);
+    $("#knowBtn").addEventListener("click", markKnown);
+    $("#againBtn").addEventListener("click", markAgain);
+    $("#speakBtn").addEventListener("click", () => speak(DECK[current].word));
+    $("#shuffleBtn").addEventListener("click", () => restart(true));
+    $("#restartBtn").addEventListener("click", () => restart(false));
+    $("#tryAgainBtn").addEventListener("click", () => restart(true));
+
+    flashcard.addEventListener("click", flipCard);
+    flashcard.addEventListener("keydown", e => {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); flipCard(); }
+      if (e.key === "ArrowLeft") { markAgain(); }
+      if (e.key === "ArrowRight") { markKnown(); }
+    });
+
+    // ---------- Init
+    restart(true);
+  </script>
+</body>
+</html>
