@@ -5,16 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Flashcards</title>
   <style>
-    :root {
-      --bg:#ffffff; --ink:#1f2937; --ink-dim:#6b7280;
-      --brand:#2563eb; --ok:#16a34a; --soft:#f3f4f6; --soft-2:#e5e7eb; --radius:14px;
-    }
+    :root { --bg:#ffffff; --ink:#1f2937; --ink-dim:#6b7280; --brand:#2563eb; --ok:#16a34a; --soft:#f3f4f6; --soft-2:#e5e7eb; --radius:14px; }
     *{box-sizing:border-box}
     html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Inter,Arial,sans-serif}
     .wrap{max-width:780px;width:100%;margin:0 auto;padding:16px}
     .card{background:#fff;border:1px solid var(--soft-2);border-radius:var(--radius);padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.04);max-width:100%}
-    h1{font-size:clamp(20px,3vw,28px);margin:0 0 8px}
-    .sub{color:var(--ink-dim);margin:0 0 18px;font-size:14px}
+    h1{font-size:clamp(20px,3vw,28px);margin:0}
+    .sub{color:var(--ink-dim);margin:8px 0 18px;font-size:14px}
 
     .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
     .progress{font-size:14px;color:var(--ink-dim)}
@@ -86,7 +83,6 @@
           <button class="btn" id="prevBtn">⟵ Previous</button>
           <button class="btn" id="nextBtn">Next ⟶</button>
           <button class="btn primary" id="knowBtn">I knew it ✓</button>
-          <button class="btn" id="shuffleBtn">Shuffle deck</button>
           <button class="btn" id="restartBtn">Restart</button>
         </div>
         <div class="msg" id="message" aria-live="polite"></div>
@@ -96,7 +92,6 @@
     <div class="card results" id="resultsCard" style="display:none">
       <h1>Results</h1>
       <p class="stat" id="summary"></p>
-      <p class="stat" id="detail"></p>
       <button class="btn primary" id="tryAgainBtn">Try Again</button>
     </div>
   </div>
@@ -136,16 +131,7 @@
     const progress = $("#progress");
     const message = $("#message");
 
-    // ---------- Utilities
-    function shuffle(arr){
-      const a=arr.slice();
-      for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
-      return a;
-    }
-
-    function setProgress(){
-      progress.textContent = `${pos+1} / ${DECK.length}`;
-    }
+    function setProgress(){ progress.textContent = `${pos+1} / ${DECK.length}`; }
 
     function render(){
       const idx = order[pos];
@@ -160,15 +146,8 @@
     }
 
     function flip(){ flipped = !flipped; flashcard.classList.toggle("flipped", flipped); }
-
-    function next(){
-      if (pos < DECK.length - 1){ pos++; flipped = false; render(); }
-      maybeFinish();
-    }
-
-    function prev(){
-      if (pos > 0){ pos--; flipped = false; render(); }
-    }
+    function next(){ if (pos < DECK.length - 1){ pos++; flipped = false; render(); } maybeFinish(); }
+    function prev(){ if (pos > 0){ pos--; flipped = false; render(); } }
 
     function markKnown(){
       const idx = order[pos];
@@ -187,15 +166,13 @@
     function showResults(){
       $("#appCard").style.display = "none";
       $("#resultsCard").style.display = "block";
-      $("#summary").textContent = "Great work!";
-      $("#detail").textContent = `You marked ${knownCount} out of ${DECK.length} cards as known.`;
+      $("#summary").textContent = `You clicked “I knew it” on ${knownCount} word${knownCount!==1?'s':''}.`;
     }
 
-    function restart(shuffleFirst=false){
+    function restart(){
       $("#resultsCard").style.display = "none";
       $("#appCard").style.display = "block";
-      order = DECK.map((_,i)=>i);
-      if (shuffleFirst) order = shuffle(order);
+      order = DECK.map((_,i)=>i);     // fixed order
       pos = 0; flipped = false;
       known.fill(false); knownCount = 0;
       render();
@@ -212,12 +189,11 @@
     $("#prevBtn").addEventListener("click", prev);
     $("#nextBtn").addEventListener("click", next);
     $("#knowBtn").addEventListener("click", markKnown);
-    $("#shuffleBtn").addEventListener("click", () => restart(true));
-    $("#restartBtn").addEventListener("click", () => restart(false));
-    $("#tryAgainBtn").addEventListener("click", () => restart(true));
+    $("#restartBtn").addEventListener("click", restart);
+    $("#tryAgainBtn").addEventListener("click", restart);
 
     // ---------- Init
-    restart(true);
+    restart();
   </script>
 </body>
 </html>
