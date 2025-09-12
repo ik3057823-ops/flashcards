@@ -45,10 +45,6 @@
     .footer{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
     .msg{min-height:1.2em;text-align:center;font-size:14px;margin-top:8px}
 
-    /* Results */
-    .results{text-align:center}
-    .stat{font-size:15px;color:var(--ink-dim);margin:6px 0}
-
     @media (max-width:480px){
       .wrap{padding:12px}
       .flashcard{height:50vh}
@@ -63,7 +59,7 @@
         <h1>Flashcards</h1>
         <div class="progress" id="progress">1 / 15</div>
       </div>
-      <p class="sub">Tap the card to flip, and use Previous/Next to navigate and “I knew it” to mark progress.</p>
+      <p class="sub">Tap the card to flip. Use Previous/Next to navigate.</p>
 
       <div class="stage">
         <div class="fc-wrap">
@@ -82,17 +78,10 @@
         <div class="footer">
           <button class="btn" id="prevBtn">⟵ Previous</button>
           <button class="btn" id="nextBtn">Next ⟶</button>
-          <button class="btn primary" id="knowBtn">I knew it ✓</button>
-          <button class="btn" id="restartBtn">Restart</button>
+          <button class="btn primary" id="restartBtn">Restart</button>
         </div>
         <div class="msg" id="message" aria-live="polite"></div>
       </div>
-    </div>
-
-    <div class="card results" id="resultsCard" style="display:none">
-      <h1>Results</h1>
-      <p class="stat" id="summary"></p>
-      <button class="btn primary" id="tryAgainBtn">Try Again</button>
     </div>
   </div>
 
@@ -117,11 +106,9 @@
     ];
 
     // ---------- State
-    let order = [];               // indices into DECK
-    let pos = 0;                  // current position in order
+    let order = [];   // indices into DECK
+    let pos = 0;      // current position in order
     let flipped = false;
-    let known = new Array(DECK.length).fill(false);
-    let knownCount = 0;
 
     // ---------- DOM helpers
     const $ = sel => document.querySelector(sel);
@@ -142,39 +129,32 @@
       setProgress();
       $("#prevBtn").disabled = pos === 0;
       $("#nextBtn").disabled = pos === DECK.length - 1;
-      message.textContent = known[idx] ? "Marked as known ✓" : "";
+      message.textContent = (pos === DECK.length - 1) ? "End of deck — press Restart or go Back." : "";
     }
 
-    function flip(){ flipped = !flipped; flashcard.classList.toggle("flipped", flipped); }
-    function next(){ if (pos < DECK.length - 1){ pos++; flipped = false; render(); } maybeFinish(); }
-    function prev(){ if (pos > 0){ pos--; flipped = false; render(); } }
-
-    function markKnown(){
-      const idx = order[pos];
-      if (!known[idx]) { known[idx] = true; knownCount++; }
-      message.textContent = "Marked as known ✓";
-      if (pos < DECK.length - 1){ pos++; flipped = false; render(); }
-      maybeFinish();
+    function flip(){
+      flipped = !flipped;
+      flashcard.classList.toggle("flipped", flipped);
     }
-
-    function maybeFinish(){
-      if (knownCount === DECK.length){
-        showResults();
+    function next(){
+      if (pos < DECK.length - 1){
+        pos++;
+        flipped = false;
+        render();
+      }
+    }
+    function prev(){
+      if (pos > 0){
+        pos--;
+        flipped = false;
+        render();
       }
     }
 
-    function showResults(){
-      $("#appCard").style.display = "none";
-      $("#resultsCard").style.display = "block";
-      $("#summary").textContent = `You clicked “I knew it” on ${knownCount} word${knownCount!==1?'s':''}.`;
-    }
-
     function restart(){
-      $("#resultsCard").style.display = "none";
-      $("#appCard").style.display = "block";
-      order = DECK.map((_,i)=>i);     // fixed order
-      pos = 0; flipped = false;
-      known.fill(false); knownCount = 0;
+      order = DECK.map((_,i)=>i); // fixed order; replace with shuffle if desired
+      pos = 0;
+      flipped = false;
       render();
     }
 
@@ -188,9 +168,7 @@
 
     $("#prevBtn").addEventListener("click", prev);
     $("#nextBtn").addEventListener("click", next);
-    $("#knowBtn").addEventListener("click", markKnown);
     $("#restartBtn").addEventListener("click", restart);
-    $("#tryAgainBtn").addEventListener("click", restart);
 
     // ---------- Init
     restart();
